@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 
 const Manager = () => {
     const [showPassword, setShowPassword] = useState(false);
@@ -7,18 +8,20 @@ const Manager = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [editingIndex, setEditingIndex] = useState(null);
 
+    const getPasswords = () => {
+        setPasswordArray([]);
+
+    };
+
     useEffect(() => {
-        let passwords = localStorage.getItem('passwords');
-        if (passwords) {
-            setPasswordArray(JSON.parse(passwords));
-        }
+        getPasswords();
     }, []);
 
     const togglePasswordVisibility = () => {
         setShowPassword((prev) => !prev);
     };
 
-    const savePassword = () => {
+    const savePassword = async () => {
         if (!form.site || !form.username || !form.password) {
             alert("All fields are required!");
             return;
@@ -28,11 +31,19 @@ const Manager = () => {
             updatedArray = [...passwordArray];
             updatedArray[editingIndex] = form;
         } else {
-            updatedArray = [...passwordArray, form];
+            updatedArray = [...passwordArray, { ...form, id: uuidv4() }];
         }
 
         setPasswordArray(updatedArray);
-        localStorage.setItem("passwords", JSON.stringify(updatedArray));
+
+        let res = await fetch('https://passop-backend-1.onrender.com/update', {
+            method: "post",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ ...form, id: uuidv4() })
+        });
+
         setForm({ site: "", username: "", password: "" });
         setIsEditing(false);
         setEditingIndex(null);
@@ -44,7 +55,7 @@ const Manager = () => {
 
     const clearPasswords = () => {
         setPasswordArray([]);
-        localStorage.removeItem('passwords');
+
     };
 
     const editPassword = (index) => {
@@ -53,10 +64,17 @@ const Manager = () => {
         setEditingIndex(index);
     };
 
-    const deletePassword = (index) => {
+    const deletePassword = async (index) => {
         const updatedArray = passwordArray.filter((_, i) => i !== index);
         setPasswordArray(updatedArray);
-        localStorage.setItem("passwords", JSON.stringify(updatedArray));
+
+
+        const idToDelete = passwordArray[index].id;  // Get the ID of the password to be deleted
+        await fetch('https://passop-backend-1.onrender.com/delete', {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: idToDelete })  // Send the ID for deletion
+        });
     };
 
     const copyText = (text) => {
@@ -134,35 +152,35 @@ const Manager = () => {
                             trigger="hover"
                             style={{ width: 24, height: 24 }}
                         ></lord-icon>
-                        {isEditing ? "Update Password" : "Add Password"}
+                        {isEditing ? "Update Password" : "Save"}
                     </button>
                 </div>
 
                 <div className="mt-8">
-                    <h2 className="font-bold text-3xl py-4">Your passwords</h2>
+                    <h2 className="font-bold text-3xl py-4">Your Passwords</h2>
                     {passwordArray.length === 0 ? (
                         <div>No passwords to show</div>
                     ) : (
-                        <>
+                        <div className="overflow-x-auto">
                             <table className="table-auto w-full rounded-md overflow-hidden">
                                 <thead className="bg-green-800 text-white">
                                     <tr>
-                                        <th className="py-2">Site</th>
-                                        <th className="py-2">Username</th>
-                                        <th className="py-2">Password</th>
-                                        <th className="py-2">Actions</th>
+                                        <th className="py-2 px-4 text-left">Site</th>
+                                        <th className="py-2 px-4 text-left">Username</th>
+                                        <th className="py-2 px-4 text-left">Password</th>
+                                        <th className="py-2 px-4 text-left">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-green-100">
                                     {passwordArray.map((item, index) => (
-                                        <tr key={index}>
-                                            <td className="py-2 border-1 border-white text-center">
-                                                <div className="flex items-center justify-center gap-2">
+                                        <tr key={index} className="border-t border-gray-300">
+                                            <td className="py-2 px-4">
+                                                <div className="flex items-center justify-between">
                                                     <a
                                                         href={item.site}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="text-blue-500 underline"
+                                                        className="text-blue-500 underline truncate"
                                                     >
                                                         {item.site}
                                                     </a>
@@ -174,8 +192,8 @@ const Manager = () => {
                                                     />
                                                 </div>
                                             </td>
-                                            <td className="py-2 border-1 border-white text-center">
-                                                <div className="flex items-center justify-center gap-2">
+                                            <td className="py-2 px-4">
+                                                <div className="flex items-center justify-between">
                                                     <span>{item.username}</span>
                                                     <img
                                                         className="cursor-pointer w-5"
@@ -185,8 +203,8 @@ const Manager = () => {
                                                     />
                                                 </div>
                                             </td>
-                                            <td className="py-2 border-1 border-white text-center">
-                                                <div className="flex items-center justify-center gap-2">
+                                            <td className="py-2 px-4">
+                                                <div className="flex items-center justify-between">
                                                     <span>{item.password}</span>
                                                     <img
                                                         className="cursor-pointer w-5"
@@ -196,7 +214,7 @@ const Manager = () => {
                                                     />
                                                 </div>
                                             </td>
-                                            <td className="py-2 border-1 border-white text-center">
+                                            <td className="py-2 px-4">
                                                 <div className="flex gap-4 justify-center">
                                                     <button
                                                         onClick={() => editPassword(index)}
@@ -216,15 +234,11 @@ const Manager = () => {
                                     ))}
                                 </tbody>
                             </table>
-                            <button
-                                onClick={clearPasswords}
-                                className="mt-4 bg-red-500 text-white px-6 py-2 rounded-full hover:bg-red-600 transition-colors"
-                            >
-                                Clear All Passwords
-                            </button>
-                        </>
+                        </div>
                     )}
                 </div>
+
+
             </div>
         </>
     );
